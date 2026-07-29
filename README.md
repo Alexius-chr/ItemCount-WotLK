@@ -1,13 +1,13 @@
 # ItemCount — WotLK 3.3.5a Backport
 
-> Backport non ufficiale dell'addon **ItemCount** per *World of Warcraft: Wrath of the Lich King* (client 3.3.5a).  
-> Traccia gli oggetti, l'oro, la posta e le aste di tutti i personaggi del tuo account.
+> Unofficial backport of the **ItemCount** addon for *World of Warcraft: Wrath of the Lich King* (client 3.3.5a).  
+> Tracks items, gold, mail and auctions across all characters on your account.
 
 ---
 
 ## 📥 Download
 
-Scarica l'ultima versione dalla sezione [Releases](../../releases) oppure clona questo repository:
+Download the latest release from the [Releases](../../releases) page, or clone this repository:
 
 ```bash
 git clone https://github.com/Alexius-chr/ItemCount-WotLK.git
@@ -15,128 +15,123 @@ git clone https://github.com/Alexius-chr/ItemCount-WotLK.git
 
 ---
 
-## ✨ Funzionalità
+## ✨ Features
 
-| Feature | Stato |
-|---------|-------|
-| Conteggio oggetti nelle **borse** | ✅ Automatico |
-| Conteggio oggetti in **banca** | ✅ Apri la banca una volta per personaggio |
-| Conteggio oggetti in **posta** | ✅ Apri la mailbox |
-| Conteggio oggetti in **asta** (AH) | ✅ Apri l'Auction House |
-| Conteggio **oro** totale account | ✅ Configurabile |
-| Tooltip su **link in chat** | ✅ |
-| Tooltip su **item equipaggiati** (character sheet) | ✅ |
-| Filtro per **realm** | ✅ |
-| Filtro per **fazione** | ✅ |
-| Pulsante sulla **minimappa** | ✅ |
+| Feature | Status |
+|---------|--------|
+| Item count in **bags** | ✅ Automatic |
+| Item count in **bank** | ✅ Open the bank once per character |
+| Item count in **mail** | ✅ Open the mailbox |
+| Item count in **auction house** | ✅ Open the AH |
+| **Gold** tracking across account | ✅ Configurable |
+| Tooltip on **chat links** | ✅ |
+| Tooltip on **equipped items** (character sheet) | ✅ |
+| **Realm** filter | ✅ |
+| **Faction** filter | ✅ |
+| **Minimap** button | ✅ |
 
 ---
 
 ## 🖼️ Screenshot
 
-<img width="550" height="398" alt="itemcount" src="https://github.com/user-attachments/assets/4771018f-6450-481f-8d36-bd6a3abed8aa" />
+<img width="550" height="398" alt="itemcount" src="https://github.com/user-attachments/assets/9763b7c3-4c68-4ac4-b05a-10d09149207e" />
 
 
-```
+## 🚀 Installation
 
-```
-
----
-
-## 🚀 Installazione
-
-1. Scarica l'ultimo `.zip` dalla sezione [Releases](../../releases).
-2. Estrai il contenuto in:
+1. Download the latest `.zip` from the [Releases](../../releases) page.
+2. Extract the contents into:
    ```
-   World of Warcraft\Interface\AddOns   ```
-3. Verifica che la struttura sia:
+   World of Warcraft\Interface\AddOns\
+   ```
+3. Make sure the folder structure looks like this:
    ```
    Interface\AddOns\ItemCount\ItemCount.toc
    Interface\AddOns\ItemCount\ItemCount.lua
    Interface\AddOns\ItemCount\ItemCountEnchanting.lua
    ```
-4. Avvia WoW e abilita l'addon nella lista degli AddOn.
-5. *(Consigliato)* Abilita gli errori Lua per il debug:
+4. Launch WoW and enable the addon in the AddOn list.
+5. *(Recommended)* Enable Lua errors for debugging:
    ```
    /console scriptErrors 1
    ```
 
 ---
 
-## ⌨️ Comandi
+## ⌨️ Slash Commands
 
-| Comando | Descrizione |
+| Command | Description |
 |---------|-------------|
-| `/ic` | Apre/chiude la finestra delle opzioni |
-| `/icmail` | Forza una scansione manuale della posta |
-| `/icauction` | Forza una scansione manuale delle aste |
+| `/ic` | Toggle the options window |
+| `/icmail` | Force a manual mail scan |
+| `/icauction` | Force a manual auction scan |
 
 ---
 
-## 📋 Come funziona
+## 📋 How It Works
 
-### Borse
-Aggiornamento automatico ad ogni cambiamento dell'inventario.
+### Bags
+Automatically updated on every inventory change.
 
-### Banca
-I dati si aggiornano solo quando **apri la banca** con un personaggio. Se non l'hai mai aperta, il conteggio banca sarà `0`.
+### Bank
+Data is only updated when you **open the bank** with a character. If you have never opened the bank, the bank count will be `0`.
 
-### Posta
-Quando apri una cassetta della posta, l'addon attende che il server invii i dati (`CheckInbox`) e poi scansiona gli allegati. Se non vedi subito i conteggi, chiudi e riapri la mailbox, oppure usa `/icmail`.
+### Mail
+When you open a mailbox, the addon waits for the server to send the data (`CheckInbox`) and then scans the attachments. If counts don't appear immediately, close and reopen the mailbox, or use `/icmail`.
 
-### Aste (Auction House)
-Quando apri l'AH, l'addon scansiona automaticamente gli oggetti che hai messo in vendita. Usa `/icauction` per forzare una scansione manuale.
+### Auctions (AH)
+When you open the Auction House, the addon automatically scans items you have listed for sale. Use `/icauction` to force a manual scan.
 
-### Dati condivisi
-Tutti i dati sono salvati in `SavedVariables` (`ItemCountDB`) e sono **condivisi tra tutti i personaggi del tuo account**. Ogni personaggio deve essere loggato almeno una volta per popolare il database.
+### Shared Data
+All data is saved in `SavedVariables` (`ItemCountDB`) and is **shared across all characters on your account**. Each character must be logged in at least once to populate the database.
 
 ---
 
-## 🔧 Opzioni
+## 🔧 Options
 
-Apri la finestra opzioni cliccando il pulsante sulla minimappa o digitando `/ic`:
+Open the options window by clicking the minimap button or typing `/ic`:
 
-- **Show Total Gold** — Mostra/nasconde il totale dell'oro nel tooltip
-- **Current Realm Only** — Mostra solo i personaggi del realm attuale
-- **Current Faction Only** — Mostra solo i personaggi della fazione attuale
-- **Wipe All Data** — Cancella tutti i dati salvati
+- **Show Total Gold** — Show/hide total gold in the tooltip
+- **Current Realm Only** — Only show characters from the current realm
+- **Current Faction Only** — Only show characters from the current faction
+- **Wipe All Data** — Delete all saved data
 
 ---
 
 ## 📝 Changelog
 
 ### v1.3-wotlk
-- ✅ Backport completo per WotLK 3.3.5a
-- ✅ Sostituite API Retail con equivalenti WotLK (`GetContainerNumSlots`, `GetContainerItemInfo`, ecc.)
-- ✅ Aggiunto supporto **posta** (`/icmail`)
-- ✅ Aggiunto supporto **aste** (`/icauction`)
-- ✅ Aggiunto tooltip su **link in chat**
-- ✅ Aggiunto tooltip su **item equipaggiati** (character sheet)
-- ✅ Rimosso `BackdropTemplate` (non necessario in 3.3.5a)
-- ✅ Rimosso `C_Timer.After` (sostituito con timer custom)
+- ✅ Full backport for WotLK 3.3.5a
+- ✅ Replaced Retail APIs with WotLK equivalents (`GetContainerNumSlots`, `GetContainerItemInfo`, etc.)
+- ✅ Added **mail** support (`/icmail`)
+- ✅ Added **auction house** support (`/icauction`)
+- ✅ Added tooltip on **chat links**
+- ✅ Added tooltip on **equipped items** (character sheet)
+- ✅ Removed `BackdropTemplate` (not needed in 3.3.5a)
+- ✅ Replaced `C_Timer.After` with custom timer
 
 ---
 
-## 🙏 Crediti
+## 🙏 Credits
 
-- **Autore originale:** [Sprellyy](https://www.curseforge.com/wow/addons/item-count)
-- **Backport & modifiche:** *(Alexius-chr)*
-- **Riferimento API posta:** [DataStore_Mails](https://www.curseforge.com/wow/addons/altoholic) by Thaoky
-
----
-
-## ⚖️ Licenza
-
-Questo è un **backport non ufficiale** di un addon esistente.  
-Tutti i diritti sull'addon originale appartengono all'autore **Sprellyy**.  
-Questo repository è distribuito "così com'è", senza garanzie.
+- **Original author:** [Sprellyy](https://www.curseforge.com/wow/addons/item-count)
+- **Backport & modifications:** Alexius-chr
+- **Mail API reference:** [DataStore_Mails](https://www.curseforge.com/wow/addons/altoholic) by Thaoky
 
 ---
 
-## 🐛 Segnalazione bug
+## ⚖️ License
 
-Se trovi un bug o hai un'idea per una nuova funzionalità, apri una [Issue](../../issues) o una [Pull Request](../../pulls).
+This is an **unofficial backport** of an existing addon.  
+All rights to the original addon belong to the author **Sprellyy**.  
+This repository is distributed "as is", without warranties.
 
 ---
 
-**Buon gaming! 🎮**
+## 🐛 Bug Reports
+
+If you find a bug or have a feature idea, open an [Issue](../../issues) or a [Pull Request](../../pulls).
+
+---
+
+**Happy gaming! 🎮**
