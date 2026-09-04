@@ -6,4 +6,3 @@
 ## SavedVariables: ItemCountDB, ItemCountSettings
 
 ItemCount.lua
-ItemCountEnchanting.lua
