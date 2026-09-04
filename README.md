@@ -110,6 +110,13 @@ Open the options window by clicking the minimap button or typing `/ic`:
 - ✅ Removed `BackdropTemplate` (not needed in 3.3.5a)
 - ✅ Replaced `C_Timer.After` with custom timer
 
+## Changelog v1.3.1
+- **Currency tracking** — Added support for all WotLK currencies (Emblems, Badge, Mark, Shard, Honor, Arena, Cooking Award, JC Token, etc.) via `GetCurrencyListInfo()` API
+- **Equipped item detection** — Items worn by the current character now show as "|cff00ff00Equipped|r" in the tooltip
+- **Chat link fix** — Clicking item links in chat now correctly shows ItemCount data in the tooltip
+- **Bag & inventory hooks** — Direct hooks on `SetBagItem` and `SetInventoryItem` for reliable tooltip detection
+- **Anti-duplicate tooltip lines** — Prevents double lines when multiple hooks fire
+- **Currency tab** — New "Currencies" tab in the options window showing all characters' currency totals
 ---
 
 ## 🙏 Credits
