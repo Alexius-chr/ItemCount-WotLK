@@ -1,6 +1,6 @@
 -- ItemCount.lua (Backported for WotLK 3.3.5a)
 local addonName, addonTable = ...
-local currentVersion = GetAddOnMetadata(addonName, "Version") or "1.2"
+local currentVersion = GetAddOnMetadata(addonName, "Version") or "1.3-wotlk"
 
 -- Ensure tables exist without overwriting existing data
 ItemCountDB = ItemCountDB or {}
@@ -13,6 +13,34 @@ if ItemCountSettings.filterFaction == nil then ItemCountSettings.filterFaction =
 if ItemCountSettings.minimapPos == nil then ItemCountSettings.minimapPos = 45 end
 
 ItemCountSettings.version = currentVersion
+
+-- Currency item IDs for WotLK 3.3.5a (from Altoholic / Currency API)
+local CURRENCY_TAB_IDS = {40752, 40753, 45624, 47241, 49426, 29434, 43589, 43228, 44990}
+local CURRENCY_TAB_LABELS = {"Hero", "Valor", "Conq", "Tri", "Frost", "Badge", "WG", "Shard", "Champ"}
+
+-- All currency IDs recognized by the tooltip (complete WotLK list)
+local CURRENCY_ALL_IDS = {
+    [29434] = true,    -- badge of justice
+    [40752] = true,    -- emblem of heroism
+    [40753] = true,    -- emblem of valor
+    [45624] = true,    -- emblem of conquest
+    [47241] = true,    -- emblem of triumph
+    [49426] = true,    -- emblem of frost
+    [43228] = true,    -- stone keeper's shard
+    [20560] = true,    -- alterac mark of honor
+    [20559] = true,    -- arathi basin mark of honor
+    [43016] = true,    -- dalaran cooking award
+    [41596] = true,    -- dalaran jewelcrafting token
+    [29024] = true,    -- eots mark of honor
+    [47395] = true,    -- isle of conquest mark of honor
+    [42425] = true,    -- strand of the ancients mark of honor
+    [20558] = true,    -- warsong gulch mark of honor
+    [43589] = true,    -- wintergrasp mark of honor
+    [43307] = true,    -- arena points
+    [44990] = true,    -- champion's seal
+    [43308] = true,    -- honor points
+    [37836] = true,    -- venture coin
+}
 
 -- Simple C_Timer.After replacement for WotLK 3.3.5a
 local function SimpleAfter(delay, func)
@@ -29,9 +57,23 @@ local function SimpleAfter(delay, func)
     f:Show()
 end
 
+-- Check if item is currently equipped
+local function IsItemEquipped(itemID)
+    for slot = 1, 19 do
+        local link = GetInventoryItemLink("player", slot)
+        if link then
+            local id = tonumber(link:match("item:(%d+)"))
+            if id == itemID then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 -- 2. OPTIONS WINDOW
 local MainFrame = CreateFrame("Frame", "ItemCountMainFrame", UIParent)
-MainFrame:SetSize(500, 500)
+MainFrame:SetSize(650, 500)
 MainFrame:SetPoint("CENTER")
 MainFrame:SetFrameStrata("DIALOG")
 MainFrame:SetMovable(true)
@@ -82,9 +124,44 @@ local GoldCheck = CreateCheck("Gold", "Show Total Gold", -40, "showGold")
 local RealmCheck = CreateCheck("Realm", "Current Realm Only", -65, "filterRealm")
 local FactionCheck = CreateCheck("Faction", "Current Faction Only", -90, "filterFaction")
 
+-- TABS
+local currentTab = "chars"
+
+local TabChars = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+TabChars:SetSize(100, 22)
+TabChars:SetPoint("TOPLEFT", 20, -115)
+TabChars:SetText("Characters")
+
+local TabCurrencies = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+TabCurrencies:SetSize(100, 22)
+TabCurrencies:SetPoint("LEFT", TabChars, "RIGHT", 5, 0)
+TabCurrencies:SetText("Currencies")
+
+local function UpdateTabButtons()
+    if currentTab == "chars" then
+        TabChars:Disable()
+        TabCurrencies:Enable()
+    else
+        TabChars:Enable()
+        TabCurrencies:Disable()
+    end
+end
+
+TabChars:SetScript("OnClick", function()
+    currentTab = "chars"
+    UpdateTabButtons()
+    RefreshCharList()
+end)
+
+TabCurrencies:SetScript("OnClick", function()
+    currentTab = "currencies"
+    UpdateTabButtons()
+    RefreshCurrencyList()
+end)
+
 -- SCROLL FRAME CONTAINER
 local ListBG = CreateFrame("Frame", nil, MainFrame)
-ListBG:SetSize(450, 300) 
+ListBG:SetSize(600, 300) 
 ListBG:SetPoint("TOP", 0, -140)
 ListBG:SetBackdrop({
     bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
@@ -104,7 +181,7 @@ _G[ScrollFrame:GetName().."ScrollBar"]:SetAlpha(0)
 _G[ScrollFrame:GetName().."ScrollBar"]:SetWidth(0)
 
 local ScrollContent = CreateFrame("Frame", nil, ScrollFrame)
-ScrollContent:SetSize(430, 1) 
+ScrollContent:SetSize(580, 1) 
 ScrollFrame:SetScrollChild(ScrollContent)
 
 -- LIST REFRESH FUNCTION
@@ -118,7 +195,7 @@ local function RefreshCharList()
 
     for i, charKey in ipairs(chars) do
         local row = CreateFrame("Frame", nil, ScrollContent)
-        row:SetSize(420, 20)
+        row:SetSize(560, 20)
         row:SetPoint("TOPLEFT", 0, -(i-1)*20)
 
         local data = ItemCountDB[charKey]
@@ -141,7 +218,131 @@ local function RefreshCharList()
     ScrollContent:SetHeight(#chars * 20)
 end
 
-MainFrame:HookScript("OnShow", RefreshCharList)
+-- CURRENCY REFRESH FUNCTION
+local function RefreshCurrencyList()
+    local children = { ScrollContent:GetChildren() }
+    for _, child in ipairs(children) do child:Hide(); child:SetParent(nil) end
+
+    local chars = {}
+    for k in pairs(ItemCountDB) do table.insert(chars, k) end
+    table.sort(chars)
+
+    local colCount = 2 + #CURRENCY_TAB_IDS -- Honor, Arena + tab currencies
+    local xOffsets = {5, 90, 135}
+    for i = 1, #CURRENCY_TAB_IDS do
+        table.insert(xOffsets, 180 + (i-1)*45)
+    end
+    table.insert(xOffsets, 180 + #CURRENCY_TAB_IDS*45) -- Total column
+
+    -- Header row
+    local header = CreateFrame("Frame", nil, ScrollContent)
+    header:SetSize(580, 20)
+    header:SetPoint("TOPLEFT", 0, 0)
+
+    local headers = {"Character", "Honor", "Arena"}
+    for _, lbl in ipairs(CURRENCY_TAB_LABELS) do table.insert(headers, lbl) end
+    table.insert(headers, "Total")
+
+    for i, h in ipairs(headers) do
+        local t = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        t:SetPoint("LEFT", xOffsets[i], 0)
+        t:SetText("|cffffcc00"..h.."|r")
+    end
+
+    local colTotals = {}
+    for i = 1, colCount do colTotals[i] = 0 end
+
+    for i, charKey in ipairs(chars) do
+        local row = CreateFrame("Frame", nil, ScrollContent)
+        row:SetSize(580, 20)
+        row:SetPoint("TOPLEFT", 0, -i * 20)
+
+        local data = ItemCountDB[charKey]
+        local c = RAID_CLASS_COLORS[data._class or "PRIEST"]
+        local cleanName = charKey:match("^(.-)%-") or charKey
+        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        nameText:SetPoint("LEFT", xOffsets[1], 0)
+        nameText:SetText(string.format("|cff%02x%02x%02x%s|r", c.r*255, c.g*255, c.b*255, cleanName))
+
+        local honor = data._honor or 0
+        local arena = data._arena or 0
+
+        local honorText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        honorText:SetPoint("LEFT", xOffsets[2], 0)
+        honorText:SetText(honor > 0 and "|cffffffff"..honor.."|r" or "|cff4444440|r")
+        colTotals[1] = colTotals[1] + honor
+
+        local arenaText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        arenaText:SetPoint("LEFT", xOffsets[3], 0)
+        arenaText:SetText(arena > 0 and "|cffffffff"..arena.."|r" or "|cff4444440|r")
+        colTotals[2] = colTotals[2] + arena
+
+        local charTotal = 0
+        for j, id in ipairs(CURRENCY_TAB_IDS) do
+            local count = 0
+            if data._currencies and data._currencies[id] then
+                count = data._currencies[id]
+            end
+            local t = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            t:SetPoint("LEFT", xOffsets[j+3], 0)
+            if count > 0 then
+                t:SetText("|cffffffff"..count.."|r")
+                charTotal = charTotal + count
+            else
+                t:SetText("|cff4444440|r")
+            end
+            colTotals[j+2] = colTotals[j+2] + count
+        end
+
+        local totalText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        totalText:SetPoint("LEFT", xOffsets[#xOffsets], 0)
+        if charTotal > 0 then
+            totalText:SetText("|cff00ff00"..charTotal.."|r")
+        else
+            totalText:SetText("|cff4444440|r")
+        end
+    end
+
+    -- Total row
+    local totalRow = CreateFrame("Frame", nil, ScrollContent)
+    totalRow:SetSize(580, 20)
+    totalRow:SetPoint("TOPLEFT", 0, -(#chars + 1) * 20)
+
+    local totalLabel = totalRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    totalLabel:SetPoint("LEFT", xOffsets[1], 0)
+    totalLabel:SetText("|cffffcc00TOTAL|r")
+
+    for i = 1, colCount do
+        local t = totalRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        t:SetPoint("LEFT", xOffsets[i+1], 0)
+        if colTotals[i] > 0 then
+            t:SetText("|cffffffff"..colTotals[i].."|r")
+        else
+            t:SetText("|cff4444440|r")
+        end
+    end
+
+    local grandTotal = 0
+    for i = 3, colCount do grandTotal = grandTotal + colTotals[i] end
+    local gtText = totalRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    gtText:SetPoint("LEFT", xOffsets[#xOffsets], 0)
+    if grandTotal > 0 then
+        gtText:SetText("|cff00ff00"..grandTotal.."|r")
+    else
+        gtText:SetText("|cff4444440|r")
+    end
+
+    ScrollContent:SetHeight((#chars + 2) * 20)
+end
+
+MainFrame:HookScript("OnShow", function()
+    UpdateTabButtons()
+    if currentTab == "chars" then
+        RefreshCharList()
+    else
+        RefreshCurrencyList()
+    end
+end)
 
 -- WIPE BUTTON
 local WipeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
@@ -151,12 +352,12 @@ WipeBtn:SetText("Wipe All Data")
 
 WipeBtn:SetScript("OnClick", function() 
     ItemCountDB = {}
-    ItemCountSettings = { showGold = true, minimapPos = 45, version = "1.2", filterRealm = false, filterFaction = false }
+    ItemCountSettings = { showGold = true, minimapPos = 45, version = currentVersion, filterRealm = false, filterFaction = false }
     RefreshCharList()
     ReloadUI() 
 end)
 
--- VERSION TEXT (Bottom Right)
+-- VERSION TEXT (Bottom Right) - MUST NOT use template + SetFont combo in WotLK
 MainFrame.Version = MainFrame:CreateFontString(nil, "OVERLAY")
 MainFrame.Version:SetFont("Fonts\\FRIZQT__.TTF", 14, "THICKOUTLINE") 
 MainFrame.Version:SetPoint("BOTTOMRIGHT", -20, 15)
@@ -354,6 +555,8 @@ local function ScanInventory()
     ItemCountDB[charKey]._lastSeen = time() 
     ItemCountDB[charKey]._money = GetMoney()
     ItemCountDB[charKey]._faction = faction
+    ItemCountDB[charKey]._honor = GetHonorCurrency and GetHonorCurrency() or 0
+    ItemCountDB[charKey]._arena = GetArenaCurrency and GetArenaCurrency() or 0
 
     for id, data in pairs(ItemCountDB[charKey]) do
         if type(data) == "table" then
@@ -433,20 +636,57 @@ mailPollFrame:SetScript("OnUpdate", function(self, elapsed)
     end
 end)
 
+-- CURRENCY SCANNER (WotLK 3.3.5a Currency API - like Altoholic)
+local function ScanCurrencies()
+    local name, realm = UnitName("player"), GetRealmName()
+    if not name or not realm or realm == "" then return end
+    local charKey = name.."-"..realm
+
+    if not ItemCountDB[charKey] then return end
+    if not ItemCountDB[charKey]._currencies then
+        ItemCountDB[charKey]._currencies = {}
+    end
+
+    if not GetCurrencyListSize then return end
+    local size = GetCurrencyListSize()
+    if size == 0 then return end
+
+    -- Expand all headers so we can scan everything
+    for i = size, 1, -1 do
+        local _, isHeader, isExpanded = GetCurrencyListInfo(i)
+        if isHeader and not isExpanded then
+            ExpandCurrencyList(i, 1)
+        end
+    end
+
+    -- Scan
+    for i = 1, GetCurrencyListSize() do
+        local currencyName, isHeader, _, _, _, count, _, _, itemID = GetCurrencyListInfo(i)
+        if not isHeader and itemID then
+            ItemCountDB[charKey]._currencies[itemID] = count or 0
+        end
+    end
+end
+
 -- 5. TOOLTIP HOOK
 function ItemCount_AddCountsToTooltip(self, link)
-    local _, itemLink = self:GetItem()
-    link = link or itemLink
+    if self._itemCountProcessed then return end
+    self._itemCountProcessed = true
 
     if not link then return end
     local itemID = tonumber(link:match("item:(%d+)"))
     if not itemID or not ItemCountDB then return end
 
+    -- Check if equipped on current character
+    local isEquipped = IsItemEquipped(itemID)
+
+    local isCurrency = CURRENCY_ALL_IDS[itemID]
     local totalGold = 0
     local sortedItems = {}
     local pName, pRealm = UnitName("player"), GetRealmName()
     local pFaction = UnitFactionGroup("player")
     local currentPlayerKey = pName .. "-" .. pRealm
+    local currentPlayerAdded = false
 
     for charKey, data in pairs(ItemCountDB) do
         local charName, charRealm = charKey:match("^(.-)%-(.*)$")
@@ -458,33 +698,74 @@ function ItemCount_AddCountsToTooltip(self, link)
 
         if passRealm and passFaction then
             if data._money then totalGold = totalGold + data._money end
-            if data[itemID] then
-                local bagCount = data[itemID].bag or 0
-                local bankCount = data[itemID].bank or 0
-                local mailCount = data[itemID].mail or 0
-                local auctionCount = data[itemID].auction or 0
-                if (bagCount + bankCount + mailCount + auctionCount) > 0 then
-                    table.insert(sortedItems, { name = charKey, bag = bagCount, bank = bankCount, mail = mailCount, auction = auctionCount, class = data._class or "PRIEST" })
+
+            if isCurrency then
+                -- Currency: use _currencies table (Currency API)
+                local currencyCount = 0
+                if data._currencies and data._currencies[itemID] then
+                    currencyCount = data._currencies[itemID]
+                end
+                if currencyCount > 0 then
+                    table.insert(sortedItems, { name = charKey, count = currencyCount, class = data._class or "PRIEST" })
+                    if charKey == currentPlayerKey then
+                        currentPlayerAdded = true
+                    end
+                end
+            else
+                -- Normal item: use bag/bank/mail/auction
+                if data[itemID] then
+                    local bagCount = data[itemID].bag or 0
+                    local bankCount = data[itemID].bank or 0
+                    local mailCount = data[itemID].mail or 0
+                    local auctionCount = data[itemID].auction or 0
+                    if (bagCount + bankCount + mailCount + auctionCount) > 0 then
+                        table.insert(sortedItems, { name = charKey, bag = bagCount, bank = bankCount, mail = mailCount, auction = auctionCount, class = data._class or "PRIEST" })
+                        if charKey == currentPlayerKey then
+                            currentPlayerAdded = true
+                        end
+                    end
                 end
             end
         end
     end
 
+    -- If equipped on current char but not in bag/bank/mail/auc, add as "Equipped"
+    if isEquipped and not currentPlayerAdded then
+        local _, class = UnitClass("player")
+        table.insert(sortedItems, { name = currentPlayerKey, bag = 0, bank = 0, mail = 0, auction = 0, class = class or "PRIEST", equipped = true })
+    end
+
     if #sortedItems > 0 then
         self:AddLine(" ")
-        self:AddLine("|cffaaaaaaCharacter          Bag    Bank    Mail    Auc    Total|r")
-        for _, itemData in ipairs(sortedItems) do
-            local mailCount = itemData.mail or 0
-            local auctionCount = itemData.auction or 0
-            local rightSide = string.format(
-                "|cff00ff00B:|r|cffffffff%3d|r |cff0080ffBk:|r|cffffffff%3d|r |cffffaa00M:|r|cffffffff%3d|r |cffff00ffA:|r|cffffffff%3d|r |cff00ffffT:|r|cffffffff%3d|r",
-                itemData.bag, itemData.bank, mailCount, auctionCount, itemData.bag + itemData.bank + mailCount + auctionCount
-            )
+        if isCurrency then
+            self:AddLine("|cffaaaaaaCharacter          Count|r")
+            for _, itemData in ipairs(sortedItems) do
+                local c = RAID_CLASS_COLORS[itemData.class] or RAID_CLASS_COLORS["PRIEST"]
+                local cleanName = itemData.name:match("^(.-)%-") or itemData.name
+                local nameStr = string.format("|cff%02x%02x%02x%s|r", c.r*255, c.g*255, c.b*255, cleanName)
+                local rightSide = string.format("|cffffffff%3d|r", itemData.count)
+                self:AddDoubleLine(nameStr, rightSide)
+            end
+        else
+            self:AddLine("|cffaaaaaaCharacter          Bag    Bank    Mail    Auc    Total|r")
+            for _, itemData in ipairs(sortedItems) do
+                local c = RAID_CLASS_COLORS[itemData.class] or RAID_CLASS_COLORS["PRIEST"]
+                local cleanName = itemData.name:match("^(.-)%-") or itemData.name
+                local nameStr = string.format("|cff%02x%02x%02x%s|r", c.r*255, c.g*255, c.b*255, cleanName)
 
-            local c = RAID_CLASS_COLORS[itemData.class] or RAID_CLASS_COLORS["PRIEST"]
-            local cleanName = itemData.name:match("^(.-)%-") or itemData.name
-            local nameStr = string.format("|cff%02x%02x%02x%s|r", c.r*255, c.g*255, c.b*255, cleanName)
-            self:AddDoubleLine(nameStr, rightSide)
+                local rightSide
+                if itemData.equipped then
+                    rightSide = "|cff00ff00Equipped|r"
+                else
+                    local mailCount = itemData.mail or 0
+                    local auctionCount = itemData.auction or 0
+                    rightSide = string.format(
+                        "|cff00ff00B:|r|cffffffff%3d|r |cff0080ffBk:|r|cffffffff%3d|r |cffffaa00M:|r|cffffffff%3d|r |cffff00ffA:|r|cffffffff%3d|r |cff00ffffT:|r|cffffffff%3d|r",
+                        itemData.bag, itemData.bank, mailCount, auctionCount, itemData.bag + itemData.bank + mailCount + auctionCount
+                    )
+                end
+                self:AddDoubleLine(nameStr, rightSide)
+            end
         end
     end
 
@@ -502,10 +783,40 @@ function ItemCount_AddCountsToTooltip(self, link)
         self:AddDoubleLine(FormatCustomMoney(pMoney), FormatCustomMoney(totalGold))
     end
 end
-GameTooltip:HookScript("OnTooltipSetItem", function(self)
-    local _, link = self:GetItem()
 
-    -- Fallback for equipped items (character sheet) where GetItem() may fail
+-- Reset processed flag when tooltip is hidden
+GameTooltip:HookScript("OnHide", function(self)
+    self._itemCountProcessed = nil
+end)
+
+if ItemRefTooltip then
+    ItemRefTooltip:HookScript("OnHide", function(self)
+        self._itemCountProcessed = nil
+    end)
+end
+
+-- Hook SetBagItem for bag items (including currency items in bags)
+hooksecurefunc(GameTooltip, "SetBagItem", function(self, bag, slot)
+    self._itemCountProcessed = nil
+    local link = GetContainerItemLink(bag, slot)
+    if link then
+        ItemCount_AddCountsToTooltip(self, link)
+    end
+end)
+
+-- Hook SetInventoryItem for equipped items (character sheet)
+hooksecurefunc(GameTooltip, "SetInventoryItem", function(self, unit, slot)
+    self._itemCountProcessed = nil
+    local link = GetInventoryItemLink(unit, slot)
+    if link then
+        ItemCount_AddCountsToTooltip(self, link)
+    end
+end)
+
+-- Fallback OnTooltipSetItem for other cases (merchant, loot, etc.)
+GameTooltip:HookScript("OnTooltipSetItem", function(self)
+    self._itemCountProcessed = nil
+    local _, link = self:GetItem()
     if not link then
         local focus = GetMouseFocus()
         while focus do
@@ -517,21 +828,27 @@ GameTooltip:HookScript("OnTooltipSetItem", function(self)
             focus = focus:GetParent()
         end
     end
-
     if link then
         ItemCount_AddCountsToTooltip(self, link)
     end
 end)
 
--- TOOLTIP FOR LINKED ITEMS (chat, mail, trade)
+-- TOOLTIP FOR LINKED ITEMS (chat, mail, trade) on GameTooltip
 hooksecurefunc(GameTooltip, "SetHyperlink", function(self, link)
+    self._itemCountProcessed = nil
     if link then
         ItemCount_AddCountsToTooltip(self, link)
     end
 end)
 
+-- CRITICAL: Hook ItemRefTooltip:SetHyperlink for clicked links in chat
 if ItemRefTooltip then
-    ItemRefTooltip:HookScript("OnTooltipSetItem", ItemCount_AddCountsToTooltip)
+    hooksecurefunc(ItemRefTooltip, "SetHyperlink", function(self, link)
+        self._itemCountProcessed = nil
+        if link then
+            ItemCount_AddCountsToTooltip(self, link)
+        end
+    end)
 end
 
 -- 6. EVENTS
@@ -567,6 +884,20 @@ f:SetScript("OnEvent", function(self, event)
             end
         end
     end
+end)
+
+-- Currency events
+local currencyFrame = CreateFrame("Frame")
+currencyFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
+currencyFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+currencyFrame:SetScript("OnEvent", function(self, event)
+    ScanCurrencies()
+end)
+
+-- Delayed initial scans to ensure realm is available
+SimpleAfter(5, function()
+    ScanInventory()
+    ScanCurrencies()
 end)
 
 SimpleAfter(3, function()
